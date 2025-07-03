@@ -1,12 +1,20 @@
 import { useEffect, useState } from "react";
 import Create from './Create';
 import axios from "axios";
-function Home() {
 
-    const [todos, setTodos] = useState([])
-    const fetchTodos = () => {
-        axios.get('http://localhost:3000/todos')
-        .then(result => setTodos(result.data))
+function Home() {
+const [todos, setTodos] = useState([])
+const [page, setPage] = useState(1);
+const [totalpages, setTotalpages] = useState(1);
+const limit = 10;
+
+    const fetchTodos = (pageNum = 1) => {
+        axios.get(`http://localhost:3000/todos/all?page=${pageNum}&limit=${limit}`)
+        .then(result => {
+            setTodos(result.data.todos);
+            setPage(result.data.page);
+            setTotalpages(result.data.totalPages)
+        })
         .catch(err => console.error("Error fetching todos:", err))
     };
 
@@ -30,6 +38,18 @@ function Home() {
             .catch(err => console.error("Error deleting todo:", err))
     }
 };
+
+    const handlePrev = () => {
+        if(page > 1){
+            fetchTodos(page-1);
+        }
+    };
+   const handleNext = () => {
+    if(page < totalpages) {
+        fetchTodos(page+1);
+    }
+   };
+
     return (
         <div>
             <h2>todolist</h2>
@@ -40,15 +60,25 @@ function Home() {
                         <h2>No records</h2>
                     </div>
                 ) : (
+                    <> {
                     todos.map((todo, index) => (
-                    <div key={index} style={{display: 'flex', justifyContent: 'space-between',  alignItems: 'center', marginBottom: '10px'  }}>
+                    <div key={index} style={{
+                        display: 'flex',
+                         justifyContent: 'space-between', 
+                          alignItems: 'center',
+                           marginBottom: '10px' 
+                     }}>
                     <span>{todo.task}</span>   
                     <button type="button" onClick={() => handleUpdate(todo)}>Update</button> 
                     <button type="button" onClick={() => handleDelete(todo)}>Delete</button> 
-        </div>
-                ))
-            )
-}
+              </div>
+                ))}
+            <div style={{marginTop: '20px',display: 'flex', gap:"10", justifyContent: 'center' }}>
+                <button onClick={handlePrev} disabled={page === 1 }>- Prev</button>
+                <span>Page {page} of {totalpages}</span>
+                <button onClick={handleNext} disabled={page === totalpages}>Next +</button>
+            </div>
+</> )}
 </div>
 );
 }

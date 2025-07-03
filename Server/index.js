@@ -27,20 +27,15 @@ mongoose.connection.on('error', (err) => {
   console.error('Error connecting to MongoDB:', err);
 });
 
-app.get('/todos', (req,res) => {
-    TodoModel.find()
-    .then(result => res.json(result))
-    .catch(err => res.status(500).json(err))
-})
 
-app.get('/todos', async(req,res) => {
+app.get('/todos/all', async(req,res) => {
     const page = parseInt(req.query.page) || 1; // Default to page 1 if not provided
   const limit = parseInt(req.query.limit) || 10; // Default to 10
 
   try{
     const total = await TodoModel.countDocuments();
     const todos = await TodoModel.find()
-    .skin((page - 1) * limit)
+    .skip((page - 1) * limit)
     .limit(limit)
     .sort({ _id: -1});
     res.json({ 
@@ -56,7 +51,7 @@ app.get('/todos', async(req,res) => {
 })
 
 
-// get one todo by id
+
 app.get('/todos/:id', (req, res) => {
   TodoModel.findById(req.params.id)
     .then(result => res.json(result))
