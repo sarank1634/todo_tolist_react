@@ -10,7 +10,8 @@ function Create() {
             .catch(err => console.log(err))
     }
     return (
-        <div><input type="text" name="taskInput" onChange={(e) => setTask(e.target.value)} />
+        <div>
+            <input type="text" name="taskInput" onChange={(e) => setTask(e.target.value)} />
             <button type="button" onClick={handleAdd}>Add</button>
         </div>
     )

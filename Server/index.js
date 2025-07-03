@@ -33,6 +33,29 @@ app.get('/todos', (req,res) => {
     .catch(err => res.status(500).json(err))
 })
 
+app.get('/todos', async(req,res) => {
+    const page = parseInt(req.query.page) || 1; // Default to page 1 if not provided
+  const limit = parseInt(req.query.limit) || 10; // Default to 10
+
+  try{
+    const total = await TodoModel.countDocuments();
+    const todos = await TodoModel.find()
+    .skin((page - 1) * limit)
+    .limit(limit)
+    .sort({ _id: -1});
+    res.json({ 
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      todos,
+    });
+  } catch(err) {
+    res.status(500).json({error: err.message})
+  }
+})
+
+
 // get one todo by id
 app.get('/todos/:id', (req, res) => {
   TodoModel.findById(req.params.id)
@@ -49,7 +72,21 @@ app.post('/add', (req, res) => {
   .catch(err => res.status(500).json(err))
 });
 
-// Start the server
+app.put('/update/:id', (req, res) => {
+  const { task} = req.body;
+
+  TodoModel.findByIdAndUpdate(req.params.id, {task}, {new:true})
+  .then(result  => res.json(result))
+  .catch(err => res.status(500).json(err));
+})
+
+
+app.delete('/delete/:id', (req,res) => {
+  TodoModel.findByIdAndDelete(req.params.id)
+  .then(result => res.json(result))
+  .catch(err => res.status(500).json(err));
+})
+
 app.listen(3000, () => {
   console.log('Server is running on port 3000');
 });
