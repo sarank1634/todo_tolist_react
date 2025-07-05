@@ -4,7 +4,7 @@
   font-weight: 400;
 
   color: #213547;
-  background-color: #ffffff;
+  background-color: #f0f2f5;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -12,36 +12,34 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #747bff;
-}
-
 body {
   margin: 0;
   display: flex;
-  place-items: center;
+  justify-content: center;
+  align-items: flex-start;
   min-width: 320px;
   min-height: 100vh;
+  padding-top: 40px;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+h2 {
+    text-align: center;
+    color: #333;
 }
+
 .save_btn{
-  background-color: green;
+  background-color: #28a745;
+  color: white;
 }
 .delete_bnt{
-  background-color: red;
+  background-color: #dc3545;
+  color: white;
 }
 .update_btn{
-  background-color: blue;
+  background-color: #007bff;
+  color: white;
 }
+
 button {
   border-radius: 8px;
   border: 1px solid transparent;
@@ -49,13 +47,14 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  /* background-color: red; */
   cursor: pointer;
   transition: all 0.25s;
 }
+
 button:hover {
-  border-color: #646cff;
+  opacity: 0.9;
 }
+
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
@@ -63,10 +62,13 @@ button:focus-visible {
 
 .home {
   width: 100%;
-  max-width: 800px; /* Adjust as needed */
+  max-width: 600px;
   margin: 0 auto;
   padding: 20px;
   box-sizing: border-box;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.1);
 }
 
 .todo-item {
