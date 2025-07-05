@@ -59,15 +59,16 @@ function Home() {
         if (window.confirm("Are you sure you want to delete this todo?")) {
             axios.delete(`http://localhost:3000/delete/${todoId}`)
                 .then(() => {
-                    if (todos.length === 1 && page > 1) {
+                    const updatedTodos = todos.filter(todo => todo._id !== todoId);
+                    if (updatedTodos.length === 0 && page > 1) {
                         fetchTodos(page - 1);
                     } else {
-                        fetchTodos(page);
+                        setTodos(updatedTodos);
                     }
                 })
                 .catch(err => console.error("Error deleting todo:", err));
         }
-    }, [todos.length, page, fetchTodos]);
+    }, [todos, page, fetchTodos]);
 
     const handlePrev = useCallback(() => {
         if (page > 1) {
