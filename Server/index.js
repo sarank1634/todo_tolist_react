@@ -1,22 +1,17 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const TodoModel = require('./Models/Todo')
+const TodoModel = require('./Models/Todo');
+const UserModel = require('./Models/User');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 // Connect to MongoDB
-mongoose.connect('mongodb+srv://saravana:Saravana1634@cluster0.gnbrisd.mongodb.net/', {
-  useNewUrlParser: true,
-  // why useNewUrlParser: true is used?
-  // The useNewUrlParser option is used to opt in to the MongoDB driver's new URL string parser.this option is recommended because the new parser handles connection strings more consistently and supports new features, such as SRV records and replica sets, which are common in modern MongoDB deployments. eg mongodb+srv://<username>:<password>@cluster0.mongodb.net/test
-  // what is srv?
-  // The srv protocol is used in MongoDB connection strings to indicate that the connection should use DNS SRV records to discover the database servers. This allows for automatic discovery of replica sets and sharded clusters without needing to specify each server individually.
-  useUnifiedTopology: true,
-  // useUnifiedTopology: true is used to opt in to the MongoDB driver's new connection management engine, which provides a more robust and efficient way to manage connections, especially in environments with multiple servers or replica sets.
-});
+mongoose.connect('mongodb+srv://saravana:Saravana1634@cluster0.gnbrisd.mongodb.net/', {});
 
 // Log connection status
 mongoose.connection.on('connected', () => {
@@ -28,57 +23,125 @@ mongoose.connection.on('error', (err) => {
 });
 
 
-app.get('/todos/all', async(req,res) => {
-    const page = parseInt(req.query.page) || 1; // Default to page 1 if not provided
-  const limit = parseInt(req.query.limit) || 10; // Default to 10
+// Middleware to verify token
+const verifyToken = (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+        return res.status(401).json({ message: 'Access denied. No token provided.' });
+    }
 
-  try{
-    const total = await TodoModel.countDocuments();
-    const todos = await TodoModel.find()
-    .skip((page - 1) * limit)
-    .limit(limit)
-    .sort({ _id: -1});
-    res.json({ 
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-      todos,
-    });
-  } catch(err) {
-    res.status(500).json({error: err.message})
-  }
+    try {
+        const decoded = jwt.verify(token, 'your_jwt_secret'); // Replace with a strong secret key
+        req.userId = decoded.userId;
+        next();
+    } catch (error) {
+        res.status(400).json({ message: 'Invalid token.' });
+    }
+};
+
+// Auth Routes
+app.post('/register', async (req, res) => {
+    try {
+        const { username, email, password } = req.body;
+        const existingUser = await UserModel.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ message: 'User with this email already exists.' });
+        }
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const newUser = new UserModel({ username, email, password: hashedPassword });
+        await newUser.save();
+        res.status(201).json({ message: 'User registered successfully!' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error during registration.' });
+    }
+});
+
+app.post('/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await UserModel.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid credentials.' });
+        }
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Invalid credentials.' });
+        }
+        const token = jwt.sign({ userId: user._id }, 'your_jwt_secret', { expiresIn: '1h' });
+        res.json({ token });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error during login.' });
+    }
+});
+
+
+app.get('/todos/all', verifyToken, async(req,res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    try{
+        const total = await TodoModel.countDocuments({ userId: req.userId });
+        const todos = await TodoModel.find({ userId: req.userId })
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .sort({ _id: -1});
+        res.json({ 
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+            todos,
+        });
+    } catch(err) {
+        res.status(500).json({error: err.message})
+    }
 })
 
 
 
-app.get('/todos/:id', (req, res) => {
-  TodoModel.findById(req.params.id)
-    .then(result => res.json(result))
+app.get('/todos/:id', verifyToken, (req, res) => {
+  TodoModel.findOne({ _id: req.params.id, userId: req.userId })
+    .then(result => {
+        if (!result) {
+            return res.status(404).json({ message: 'Todo not found.' });
+        }
+        res.json(result)
+    })
     .catch(err => res.status(500).json(err));
 });
 
 // Define routes
-app.post('/add', (req, res) => {
-  const task = req.body.task;
+app.post('/add', verifyToken, (req, res) => {
+  const { task } = req.body;
   TodoModel.create({
-    task:task
+    task: task,
+    userId: req.userId
   }).then(result => res.json(result))
   .catch(err => res.status(500).json(err))
 });
 
-app.put('/update/:id', (req, res) => {
-  const { task} = req.body;
+app.put('/update/:id', verifyToken, (req, res) => {
+  const { task } = req.body;
 
-  TodoModel.findByIdAndUpdate(req.params.id, {task}, {new:true})
-  .then(result  => res.json(result))
+  TodoModel.findOneAndUpdate({ _id: req.params.id, userId: req.userId }, { task }, { new:true })
+  .then(result => {
+      if (!result) {
+          return res.status(404).json({ message: 'Todo not found.' });
+      }
+      res.json(result)
+  })
   .catch(err => res.status(500).json(err));
 })
 
 
-app.delete('/delete/:id', (req,res) => {
-  TodoModel.findByIdAndDelete(req.params.id)
-  .then(result => res.json(result))
+app.delete('/delete/:id', verifyToken, (req,res) => {
+  TodoModel.findOneAndDelete({ _id: req.params.id, userId: req.userId })
+  .then(result => {
+      if (!result) {
+          return res.status(404).json({ message: 'Todo not found.' });
+      }
+      res.json(result)
+  })
   .catch(err => res.status(500).json(err));
 })
 

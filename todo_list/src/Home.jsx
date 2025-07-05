@@ -1,159 +1,137 @@
 import { useEffect, useState, useCallback } from "react";
+import axios from 'axios';
+import { BsCircleFill, BsFillCheckCircleFill } from 'react-icons/bs';
 import { useNavigate } from 'react-router-dom';
-import Create from './Create';
-import axios from "axios";
 
 function Home() {
-    const navigate = useNavigate();
     const [todos, setTodos] = useState([]);
+    const [task, setTask] = useState('');
     const [page, setPage] = useState(1);
-    const [totalpages, setTotalpages] = useState(1);
-    const [loading, setLoading] = useState(true);
-    const [editingTodoId, setEditingTodoId] = useState(null);
-    const [editingTodoText, setEditingTodoText] = useState('');
-    const limit = 10;
+    const [totalPages, setTotalPages] = useState(1);
+    const navigate = useNavigate();
 
-    const fetchTodos = useCallback((pageNum = 1) => {
-        setLoading(true);
-        axios.get(`http://localhost:3000/todos/all?page=${pageNum}&limit=${limit}`)
-            .then(result => {
-                setTodos(result.data.todos);
-                setPage(result.data.page);
-                setTotalpages(result.data.totalPages);
-            })
-            .catch(err => {
-                console.error("Error fetching todos:", err);
-            })
-            .finally(() => {
-                setLoading(false);
-            });
-    }, [limit]);
-
-    useEffect(() => {
+    const fetchTodos = useCallback((currentPage) => {
         const token = localStorage.getItem('token');
         if (!token) {
             navigate('/login');
             return;
         }
 
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        fetchTodos();
-    }, [fetchTodos, navigate]);
+        axios.get(`http://localhost:3000/todos/all?page=${currentPage}&limit=5`, {
+            headers: { Authorization: `Bearer ${token}` }
+        })
+        .then(result => {
+            setTodos(result.data.todos);
+            setTotalPages(result.data.totalPages);
+            setPage(result.data.currentPage);
+        })
+        .catch(err => console.error(err));
+    }, [navigate]);
 
-    const handleUpdate = (todo) => {
-        setEditingTodoId(todo._id);
-        setEditingTodoText(todo.task);
+    useEffect(() => {
+        fetchTodos(page);
+    }, [fetchTodos, page]);
+
+    const handleAdd = () => {
+        if (task.trim() === '') return;
+        axios.post('http://localhost:3000/add', { task: task }, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        })
+        .then(() => {
+            setTask('');
+            if (page === 1) {
+                fetchTodos(1);
+            } else {
+                setPage(1);
+            }
+        })
+        .catch(err => console.error(err));
     };
 
-    const handleSaveUpdate = useCallback((todoId) => {
-        if (editingTodoText && editingTodoText.trim()) {
-            axios.put(`http://localhost:3000/update/${todoId}`, { task: editingTodoText })
-                .then(() => {
-                    setTodos(prevTodos =>
-                        prevTodos.map(todo =>
-                            todo._id === todoId ? { ...todo, task: editingTodoText } : todo
-                        )
-                    );
-                    setEditingTodoId(null);
-                    setEditingTodoText('');
-                })
-                .catch(err => {
-                    console.error("Error updating todo:", err);
-                    fetchTodos(page);
-                });
-        }
-    }, [editingTodoText, page, fetchTodos]);
+    const handleEdit = (id) => {
+        axios.put(`http://localhost:3000/update/${id}`, {}, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        })
+        .then(() => {
+            setTodos(prevTodos => 
+                prevTodos.map(todo => todo._id === id ? { ...todo, done: !todo.done } : todo)
+            );
+        })
+        .catch(err => console.error(err));
+    };
 
-    const handleDelete = useCallback((todoId) => {
-        if (window.confirm("Are you sure you want to delete this todo?")) {
-            axios.delete(`http://localhost:3000/delete/${todoId}`)
-                .then(() => {
-                    const updatedTodos = todos.filter(todo => todo._id !== todoId);
-                    if (updatedTodos.length === 0 && page > 1) {
-                        fetchTodos(page - 1);
-                    } else {
-                        setTodos(updatedTodos);
-                    }
-                })
-                .catch(err => console.error("Error deleting todo:", err));
-        }
-    }, [todos, page, fetchTodos]);
-
-    const handlePrev = useCallback(() => {
-        if (page > 1) {
-            fetchTodos(page - 1);
-        }
-    }, [page, fetchTodos]);
-
-    const handleNext = useCallback(() => {
-        if (page < totalpages) {
-            fetchTodos(page + 1);
-        }
-    }, [page, totalpages, fetchTodos]);
-
-    const handleAdd = useCallback(() => {
-        axios.get(`http://localhost:3000/todos/all?page=1&limit=9999`)
-            .then(result => {
-                const newTotalPages = result.data.totalPages;
-                fetchTodos(newTotalPages);
-            })
-            .catch(err => {
-                console.error("Error calculating last page:", err);
-                fetchTodos();
-            });
-    }, [fetchTodos]);
+    const handleDelete = (id) => {
+        axios.delete(`http://localhost:3000/delete/${id}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        })
+        .then(() => {
+            if (todos.length === 1 && page > 1) {
+                setPage(page - 1);
+            } else {
+                fetchTodos(page);
+            }
+        })
+        .catch(err => console.error(err));
+    };
 
     const handleLogout = () => {
         localStorage.removeItem('token');
         navigate('/login');
     };
 
+    const handlePageChange = (newPage) => {
+        if (newPage > 0 && newPage <= totalPages) {
+            setPage(newPage);
+        }
+    };
+
     return (
-        <div className="home">
-            <div className="header">
-                <h2>Todo List</h2>
+        <div className='home_page'>
+            <div className='container'>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2>My To-Do List</h2>
                 <button onClick={handleLogout} className="logout-btn">Logout</button>
             </div>
-            <Create onAdd={handleAdd} />
-            {loading ? (
-                <div><h2>Loading...</h2></div>
-            ) : todos.length === 0 ? (
-                <div>
-                    <h2>No records</h2>
-                </div>
-            ) : (
-                <>
-                    {todos.map((todo) => (
-                        <div key={todo._id} className="todo-item">
-                            {editingTodoId === todo._id ? (
-                                <input
-                                    type="text"
-                                    className="edit-input"
-                                    value={editingTodoText}
-                                    onChange={(e) => setEditingTodoText(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSaveUpdate(todo._id)}
-                                    autoFocus
-                                />
-                            ) : (
-                                <span className="task-text">{todo.task}</span>
-                            )}
-                            <div className="todo-actions">
-                                {editingTodoId === todo._id ? (
-                                    <button className="save_btn" type="button" onClick={() => handleSaveUpdate(todo._id)}>Save</button>
-                                ) : (
-                                    <button className="update_btn" type="button" onClick={() => handleUpdate(todo)}>Update</button>
-                                )}
-                                <button className="delete_bnt" type="button" onClick={() => handleDelete(todo._id)}>Delete</button>
+
+            <form className="create_form" onSubmit={(e) => { e.preventDefault(); handleAdd(); }}>
+                <input 
+                    type="text" 
+                    placeholder='What do you need to do?' 
+                    value={task} 
+                    onChange={(e) => setTask(e.target.value)} 
+                />
+                <button type="submit">Add Task</button>
+            </form>
+
+            <ul className="task_list">
+                {todos.length > 0 ? (
+                    todos.map(todo => (
+                        <li key={todo._id} className={`task_item ${todo.done ? 'completed' : ''}`}>
+                            <div className='checkbox' onClick={() => handleEdit(todo._id)}>
+                                {todo.done ? 
+                                    <BsFillCheckCircleFill className='icon' /> : 
+                                    <BsCircleFill className='icon' />
+                                }
+                                <p>{todo.task}</p>
                             </div>
-                        </div>
-                    ))}
-                    <div className="pagination">
-                        <button onClick={handlePrev} disabled={page <= 1}>- Prev</button>
-                        <span>Page {page} of {totalpages}</span>
-                        <button onClick={handleNext} disabled={page >= totalpages}>Next +</button>
-                    </div>
-                </>
+                            <div className="btn_container">
+                                <button className="delete_btn" onClick={() => handleDelete(todo._id)}>Delete</button>
+                            </div>
+                        </li>
+                    ))
+                ) : (
+                    <li><h2>No tasks yet. Great job!</h2></li>
+                )}
+            </ul>
+
+            {totalPages > 1 && (
+                <div className="pagination">
+                    <button onClick={() => handlePageChange(page - 1)} disabled={page === 1}>Previous</button>
+                    <span>Page {page} of {totalPages}</span>
+                    <button onClick={() => handlePageChange(page + 1)} disabled={page === totalPages}>Next</button>
+                </div>
             )}
+            </div>
         </div>
     );
 }
