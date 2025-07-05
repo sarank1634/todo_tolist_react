@@ -1,8 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from 'react-router-dom';
 import Create from './Create';
 import axios from "axios";
 
 function Home() {
+    const navigate = useNavigate();
     const [todos, setTodos] = useState([]);
     const [page, setPage] = useState(1);
     const [totalpages, setTotalpages] = useState(1);
@@ -28,8 +30,15 @@ function Home() {
     }, [limit]);
 
     useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            navigate('/login');
+            return;
+        }
+
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         fetchTodos();
-    }, [fetchTodos]);
+    }, [fetchTodos, navigate]);
 
     const handleUpdate = (todo) => {
         setEditingTodoId(todo._id);
@@ -94,9 +103,17 @@ function Home() {
             });
     }, [fetchTodos]);
 
+    const handleLogout = () => {
+        localStorage.removeItem('token');
+        navigate('/login');
+    };
+
     return (
         <div className="home">
-            <h2>Todo List</h2>
+            <div className="header">
+                <h2>Todo List</h2>
+                <button onClick={handleLogout} className="logout-btn">Logout</button>
+            </div>
             <Create onAdd={handleAdd} />
             {loading ? (
                 <div><h2>Loading...</h2></div>
